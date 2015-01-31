@@ -157,7 +157,7 @@ Base element for all the images operations.
 
       src: null,
 
-      canvases: null,
+      canvases: { value: null, reflect: true },
       canvas: { value: null, reflect: true },
 
       image: null,
@@ -178,13 +178,13 @@ Base element for all the images operations.
       // ===================================================================
 
       // More info: http://www.polymer-project.org/docs/polymer/polymer.html#lifecyclemethods
-      created: function() {
+      ready: function() {
+        this.canvases = [];
         this.throb = {
           type: 'balls',
           color: [0x80,0x80,0x80],
           size: { width: 300, height: 150 }
         };
-        this.canvases = [];
       },
 
       // ===================================================================
@@ -197,11 +197,6 @@ Base element for all the images operations.
       },
 
       canvasChanged: function() {
-        // FIXME INEFFICTIVE, BLINKING
-        this.canvases.forEach(function(c) {
-          c.style.display = "none";
-        });
-        this.canvas.style.display = "";
         if (-1 === this.canvases.indexOf(this.canvas)) {
           this.canvases.push(this.canvas);
         }
@@ -254,13 +249,15 @@ Base element for all the images operations.
             break;
         }
 
-        var container = this.$.figure;
-
         // create canvas
-        var canvas = document.createElement('canvas');
-        container.style.width = (canvas.width = w) + 'px';
-        container.style.height = (canvas.height = h) + 'px';
-        this.canvas = canvas;
+        this.canvas = document.createElement('canvas');
+
+        var container = this.$.figure;
+        while (container.firstChild) {
+          container.removeChild(container.firstChild);
+        }
+        container.style.width = (this.canvas.width = w) + 'px';
+        container.style.height = (this.canvas.height = h) + 'px';
         container.appendChild(this.canvas);
 
         // draw image with proper orientation
@@ -383,15 +380,17 @@ Base element for all the images operations.
     Polymer({
       arabesques: { value: null, reflect: true },
 
-      format: '✎ {caption} ✉ {address} ⌚ {date} ',
+      format: '✎ {caption} © {master} ✉ {geo} ⌚ {date} ',
 
       caption: '',
+
+      master: '',
 
       // ===================================================================
       // ==== overrides ====================================================
       // ===================================================================
 
-      created: function() {
+      ready: function() {
         this.super();
         this.arabesques = {
           font: '12px Impact, fantasy',
@@ -411,11 +410,7 @@ Base element for all the images operations.
 
       formatCaption: function() {
         return this.format.replace(/\{[cC]\w*?\}/g, this.caption || '')
-                          .replace(/\{[aA]\w*?\}/g, this.address || '')
-                          .replace(/\{[gG]\w*?\}/g, this.latlon || '')
-                          .replace(/\{[dD]\w*?\}/g, this.date || '')
-                          .replace(/\{[tT]\w*?\}/g, this.time || '')
-                          .replace(/\{[hH]\w*?\}/g, this.author || '')
+                          .replace(/\{[mM]\w*?\}/g, this.master || '')
                           .replace(/[^\p{S}]  /g, '')
                           .trim();
       },
@@ -454,6 +449,88 @@ Base element for all the images operations.
       }
     });
   </script>
+</polymer-element>
+
+<polymer-element name="mudasobwa-image-geo" extends="mudasobwa-image-caption"
+                 attributes="exify date time latlon"
+                 on-mudasobwa-image-ready="{{ handleExif }}">
+  <script>
+    Polymer({
+      latlon: null,
+      exify: false,
+      date: null,
+      time: null,
+
+      // ===================================================================
+      // ==== internals ====================================================
+      // ===================================================================
+
+      formatCaption: function() {
+        return this.format.replace(/\{[cC]\w*?\}/g, this.caption || '')
+                          .replace(/\{[aA]\w*?\}/g, this.address || '')
+                          .replace(/\{[gG]\w*?\}/g, this.gypsy() || '')
+                          .replace(/\{[dD]\w*?\}/g, this.date || '')
+                          .replace(/\{[tT]\w*?\}/g, this.time || '')
+                          .replace(/\{[mM]\w*?\}/g, this.master || '')
+                          .replace(/[^\p{S}]  /g, '')
+                          .trim();
+      },
+
+      parseDateTime: function() {
+        var timestamp = this.getExifTag('DateTimeOriginal') || this.getExifTag('GPSDateStamp');
+        if (timestamp && timestamp.length) {
+          var t = timestamp.split(/\s+/);
+          var d = t[0].replace(/[:\/.,]/g, '-');
+          this.date = d;
+          this.time = t[1];
+          this.datetime = new Date(d + ' ' + t[1]);
+        } else {
+          this.date = this.time = this.datetime = null;
+        }
+      },
+
+      gypsy: function() {
+        var value = this.latlon;
+        if(!value) {
+          return null; // no worry
+        }
+        var lla = { lat: +value[0], lon: +value[1], alt: +(value.length > 2 ? value[2] : 0) };
+        var result = {};
+        var hemispheres = { lat: ['N','S'], lon: ['E','W'] };
+        ['lat', 'lon'].forEach(function(tude) {
+          var deg = Math.floor(lla[tude]);
+          var min = Math.floor((lla[tude] - deg) * 60);
+          var sec = Math.floor(((lla[tude] - deg) * 60 - min) * 60);
+          result[tude] = '' + deg + '°' + min + '′' + sec + '″' + hemispheres[tude][+(+lla[tude] != -lla[tude])];
+        });
+        return result.lat + ',' + result.lon;
+      },
+
+      parseGypsy: function() {
+        // retrieve geo info from image
+        var lat = this.getExifTag('GPSLatitude');
+        var lon = this.getExifTag('GPSLongitude');
+        var alt = this.getExifTag('GPSAltitude');
+
+        if (lat && lat.constructor === Array && lon && lon.constructor === Array) { // GEO is presented
+          this.latlon =
+          [
+            (lat[0] + lat[1]/60.0 + lat[2]/3600.0) * ('S' == this.getExifTag("GPSLatitudeRef") ? -1 : 1),
+            (lon[0] + lon[1]/60.0 + lon[2]/3600.0) * ('W' == this.getExifTag("GPSLongitudeRef") ? -1 : 1),
+            ('1' == this.getExifTag("GPSAltitudeRef")) ? -alt : +alt
+          ];
+        }
+      },
+
+      handleExif: function(e) {
+        if(this.exify) {
+          this.parseDateTime();
+          this.parseGypsy();
+          this.draw();
+        }
+      }
+    });
+    </script>
 </polymer-element>
 
 <polymer-element name="mudasobwa-image-caman" extends="mudasobwa-image" noscript>
