@@ -4,15 +4,16 @@
 
 <polymer-element name="mudasobwa-throbber" attributes="width height color type throbbing">
   <template>
-    <div id="container" style="width:{{ width }}px;height:{{ height }}px"></div>
+    <div id="container" style="width:{{ w }}px;height:{{ h }}px;display:{{ d }};"></div>
   </template>
   <script>
     Polymer({
-      throbber: null,
+      throbber: { value: null, reflect: true },
 
       computed: {
         w: 'throbber ? width : 0',
-        h: 'throbber ? height : 0'
+        h: 'throbber ? height : 0',
+        d: 'throbber ? "block" : "none"'
       },
 
       /**
@@ -129,6 +130,7 @@ Base element for all the images operations.
     </mudasobwa-throbber>
 
     <figure>
+      <div id="figure"></div>
       <figcaption id="caption">
         <template if="{{ description }}">
           <p>{{ description }}</p>
@@ -158,7 +160,9 @@ Base element for all the images operations.
 
       image: null,
 
-      throb: null,
+      description: { value: null, reflect: true },
+
+      throb: { value: null, reflect: true },
 
       exif: null,
 
@@ -175,7 +179,7 @@ Base element for all the images operations.
       created: function() {
         this.throb = {
           type: 'balls',
-          color: [0x40,0x40,0x40],
+          color: [0x80,0x80,0x80],
           size: { width: 300, height: 150 }
         };
       },
@@ -186,7 +190,83 @@ Base element for all the images operations.
 
       srcChanged: function() {
         // pass control to the main thread to avoid lock on image loading
-        this.async(function() { this.loadImage(); }, null, 10);
+        this.async(function() { this.loadImage(); });
+      },
+
+      // ===================================================================
+      // ==== protected helpers ============================================
+      // ===================================================================
+
+      /**
+      *  Draws canvas.
+      *
+      *  http://www.daveperrett.com/articles/2012/07/28/exif-orientation-handling-is-a-ghetto/
+      *
+      *      Value	0th Row	0th Column
+      *      1	top	left side
+      *      2	top	right side
+      *      3	bottom	right side
+      *      4	bottom	left side
+      *      5	left side	top
+      *      6	right side	top
+      *      7	right side	bottom
+      *      8	left side	bottom
+      *
+      *  @todo currently we do not handle mirroring
+      */
+      masterpiece: function() {
+        if(!this.image) {
+          // We are not yet ready to redraw. No worry.
+          return false;
+        }
+
+        var w = this.image.width;
+        var h = this.image.height;
+        var a = 0;
+
+        switch (this.orientation) {
+          case 3:
+            a = Math.PI;
+            break;
+          case 6:
+            w = this.image.height;
+            h = this.image.width;
+            a = Math.PI / 2.0;
+            break;
+          case 8:
+            w = this.image.height;
+            h = this.image.width;
+            a = - Math.PI / 2.0;
+            break;
+        }
+
+        // clear previous canvases // FIXME
+        var container = this.$.figure;
+        while (container.firstChild) {
+          container.removeChild(container.firstChild);
+        }
+
+        // create canvas
+        this.canvas = document.createElement('canvas');
+        container.style.width = (this.canvas.width = w) + 'px';
+        container.style.height = (this.canvas.height = h) + 'px';
+        container.appendChild(this.canvas);
+
+        // draw image with proper orientation
+        var ctx = this.canvas.getContext('2d');
+        if (a != 0) {
+          ctx.save();
+          ctx.translate(this.canvas.width / 2, this.canvas.height / 2);
+          ctx.rotate(a);
+          ctx.drawImage(this.image, -this.canvas.height / 2, -this.canvas.width / 2);
+          ctx.restore();
+        } else {
+          ctx.drawImage(this.image, 0, 0);
+        }
+
+        ctx.save();
+        this.updated += 1;
+        return ctx;
       },
 
       // ===================================================================
@@ -206,6 +286,7 @@ Base element for all the images operations.
         this.image.onload = function() {
           EXIF.getData(self.image, function() {
             self.exif = EXIF.getAllTags(self.image);
+            self.masterpiece();
             self.fireImageReady();
           });
           self.$.throbber.throbbing = false;
@@ -257,10 +338,10 @@ Base element for all the images operations.
             }
 
             if (result && result.length > 0) {
-              this.fireImageDescription(result);
+              this.fireImageDescription(this.description = result);
             }
           }
-        }, 10, this);
+        }, this, 10);
       },
 
       // ===================================================================
@@ -269,7 +350,6 @@ Base element for all the images operations.
 
       fireImageReady: function() {
         this.fire('mudasobwa-image-ready', { image: this.image, exif: this.exif });
-        this.updated += 1;
         this.parseImageDescription();
       },
 
