@@ -2,6 +2,101 @@
 <link rel="import" href="../core-ajax/core-ajax.html">
 <script src="../exif-js/exif.js"></script>
 
+<polymer-element name="mudasobwa-throbber" attributes="width height color type throbbing">
+  <template>
+    <div id="container" style="width:{{ width }}px;height:{{ height }}px"></div>
+  </template>
+  <script>
+    Polymer({
+      throbber: null,
+
+      computed: {
+        w: 'throbber ? width : 0',
+        h: 'throbber ? height : 0'
+      },
+
+      /**
+      * The `toggleThrobber` method will create a throbber. Used internally by `ready` handler.
+      *
+      * Code is gratefully stolen from
+      *     http://ablog.gawley.org/2009/05/randomness-throbbers-and-tag.html
+      *     and adopted for use inside polymer element.
+      *
+      * @method toggleThrobber
+      * @param {Integer} id of the element to embed throbber into.
+      */
+      throbbingChanged: function() {
+        if(!this.throbbing) {
+          this.throbber.stop();
+          this.throbber = null;
+        } else {
+          var self = this;
+          this.throbber = new function() {
+            // prepare canvas
+            this.t = self.$.container;
+            this.c = document.createElement('canvas');
+            this.c.width = parseInt(this.t.style.width); // offsetWidth;
+            this.c.height = parseInt(this.t.style.height); // offsetHeight;
+            this.t.appendChild(this.c);
+
+            this.options = {
+              speedMS: 100,
+              center: Math.min(this.c.width, this.c.height) >> 2,
+              thickness: Math.min(this.c.width, this.c.height) >> 6,
+              spokes: Math.min(this.c.width, this.c.height) >> 3,
+              color: self.color,
+              style: self.type
+            };
+
+            this.throb = function() {
+              var ctx = this.c.getContext("2d");
+              ctx.translate(this.c.width/2, this.c.height/2);
+              var w = Math.floor(Math.min(this.c.width,this.c.height)/2);
+              var self = this;
+              var o = self.options;
+              var draw = function() {
+                ctx.clearRect(-self.c.width/2,-self.c.height/2,self.c.width,self.c.height)
+                ctx.restore();
+                ctx.shadowOffsetX = ctx.shadowOffsetY = 1;
+                ctx.shadowBlur = 2;
+                ctx.shadowColor = "rgba(220, 220, 220, 0.5)";
+                for (var i = 0; i < o.spokes; i++) {
+                  r = 255-Math.floor((255-o.color[0]) / o.spokes * i);
+                  g = 255-Math.floor((255-o.color[1]) / o.spokes * i);
+                  b = 255-Math.floor((255-o.color[2]) / o.spokes * i);
+                  ctx.fillStyle = "rgb(" + r + "," + g + "," + b + ")";
+
+                  if(o.style == "balls") {
+                    ctx.beginPath();
+                    ctx.moveTo(w,0)
+                    ctx.arc(w-Math.floor(Math.PI*2*w/o.spokes/3),0,Math.floor(Math.PI*2*w/o.spokes/3),0,Math.PI*2,true);
+                    ctx.fill();
+                  } else {
+                    ctx.fillRect(o.center, -Math.floor(o.thickness/2), w-o.center, o.thickness);
+                  }
+                  ctx.rotate(Math.PI/(o.spokes/2));
+                  if (i == 0) {
+                    ctx.save();
+                  }
+                }
+              };
+              draw();
+              this.timer = setInterval(draw,this.options.speedMS);
+            };
+
+            this.stop = function() {
+              clearInterval(this.timer);
+              this.c.getContext("2d").clearRect(-this.c.width/2,-this.c.height/2,this.c.width,this.c.height);
+              this.t.removeChild(this.c);
+            };
+          };
+          this.throbber.throb();
+        }
+      }
+    });
+  </script>
+</polymer-element>
+
 <!--
 Base element for all the images operations.
 
@@ -25,8 +120,15 @@ Base element for all the images operations.
       on-core-error="{{ failImage }}">
     </core-ajax>
 
+    <mudasobwa-throbber
+      id="throbber"
+      width="{{ throb.size.width }}"
+      height="{{ throb.size.height }}"
+      color="{{ throb.color }}"
+      type="{{ throb.type }}">
+    </mudasobwa-throbber>
+
     <figure>
-      <div id="container" style="width:{{ size.width }}px;height:{{ size.height }}px"></div>
       <figcaption id="caption">
         <template if="{{ description }}">
           <p>{{ description }}</p>
@@ -88,20 +190,12 @@ Base element for all the images operations.
       },
 
       // ===================================================================
-      // ==== event fires ==================================================
-      // ===================================================================
-
-      fireImageReady: function() {
-        this.fire('mudasobwa-image-ready', { image: this.image, exif: this.exif });
-        this.updated += 1;
-      },
-
-      // ===================================================================
       // ==== private helpers ==============================================
       // ===================================================================
 
       loadImage: function() {
         this.$.imageLoader.url = this.src;
+        this.$.throbber.throbbing = true;
         this.$.imageLoader.go();
       },
 
@@ -114,56 +208,75 @@ Base element for all the images operations.
             self.exif = EXIF.getAllTags(self.image);
             self.fireImageReady();
           });
+          self.$.throbber.throbbing = false;
         };
         this.image.src = URL.createObjectURL(this.$.imageLoader.response);
       },
 
       failImage: function() {
         console.warn("Failed to get requested resource: ", this.src);
+        this.$.throbber.throbbing = false;
       },
 
       getExifTag: function(name) {
         return this.exif ? this.exif[name] : null;
       },
 
-      getComment: function() {
-        // retrieve comment from image
-        var comment = this.getExifTag('ImageDescription');
+      parseImageDescription: function() {
+        this.async(function() {
+          // retrieve comment from image
+          var comment = this.getExifTag('ImageDescription');
 
-        if (comment && comment.length > 0) { // byte array ⇒ utf8
-          var i = 0;
-          var c0 = c1 = c2 = c3 = 0;
-          var result = '';
+          if (comment && comment.length > 0) { // byte array ⇒ utf8
+            var i = 0;
+            var c0 = c1 = c2 = c3 = 0;
+            var result = '';
 
-          while( i < comment.length ) {
-            c0 = comment.charCodeAt(i)&0xff;
+            while( i < comment.length ) {
+              c0 = comment.charCodeAt(i)&0xff;
 
-            if( c0 < 128 ) {
-              result += String.fromCharCode(c0);
-              i++;
-            } else if( (c0 > 191) && (c0 < 224) ) {
-              if( i+1 >= comment.length ) {
-                throw "Bad UTF-8 content in ImageDescription. Skipping...";
+              if( c0 < 128 ) {
+                result += String.fromCharCode(c0);
+                i++;
+              } else if( (c0 > 191) && (c0 < 224) ) {
+                if( i+1 >= comment.length ) {
+                  throw "Bad UTF-8 content in ImageDescription. Skipping...";
+                }
+                c2 = comment.charCodeAt(i+1)&0xff;
+                result += String.fromCharCode( ((c0&31)<<6) | (c2&63) );
+                i+=2;
+              } else {
+                if( i+2 >= comment.length  || i+1 >= comment.length ) {
+                  throw "Bad UTF-8 content in ImageDescription. Skipping...";
+                }
+                c2 = comment.charCodeAt(i+1)&0xff;
+                c3 = comment.charCodeAt(i+2)&0xff;
+                result += String.fromCharCode( ((c0&15)<<12) | ((c2&63)<<6) | (c3&63) );
+                i+=3;
               }
-              c2 = comment.charCodeAt(i+1)&0xff;
-              result += String.fromCharCode( ((c0&31)<<6) | (c2&63) );
-              i+=2;
-            } else {
-              if( i+2 >= comment.length  || i+1 >= comment.length ) {
-                throw "Bad UTF-8 content in ImageDescription. Skipping...";
-              }
-              c2 = comment.charCodeAt(i+1)&0xff;
-              c3 = comment.charCodeAt(i+2)&0xff;
-              result += String.fromCharCode( ((c0&15)<<12) | ((c2&63)<<6) | (c3&63) );
-              i+=3;
+            }
+
+            if (result && result.length > 0) {
+              this.fireImageDescription(result);
             }
           }
+        }, 10, this);
+      },
 
-          if (result && result.length > 0) {
-            this.fireComment(result);
-          }
-        }
+      // ===================================================================
+      // ==== event fires ==================================================
+      // ===================================================================
+
+      fireImageReady: function() {
+        this.fire('mudasobwa-image-ready', { image: this.image, exif: this.exif });
+        this.updated += 1;
+        this.parseImageDescription();
+      },
+
+      fireImageDescription: function(desc) {
+        this.fire('mudasobwa-image-description', { text: desc });
       }
+
     });
 
   </script>
