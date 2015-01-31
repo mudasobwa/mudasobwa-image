@@ -1,0 +1,171 @@
+<link rel="import" href="../polymer/polymer.html">
+<link rel="import" href="../core-ajax/core-ajax.html">
+<script src="../exif-js/exif.js"></script>
+
+<!--
+Base element for all the images operations.
+
+##### Example
+
+    <mudasobwa-image src="i/1.jpg"></mudasobwa-image>
+
+@element mudasobwa-image
+@blurb Base element for all the image operations.
+@status alpha
+@homepage http://rocket-science.ru/wc/mudasobwa-image
+-->
+<polymer-element name="mudasobwa-image" attributes="src">
+  <template>
+    <link rel="stylesheet" href="mudasobwa-image.css" />
+
+    <core-ajax
+      id="imageLoader"
+      handleAs="blob"
+      on-core-response="{{ gotImage }}"
+      on-core-error="{{ failImage }}">
+    </core-ajax>
+
+    <figure>
+      <div id="container" style="width:{{ size.width }}px;height:{{ size.height }}px"></div>
+      <figcaption id="caption">
+        <template if="{{ description }}">
+          <p>{{ description }}</p>
+        </template>
+
+        <content id="content"></content>
+      </figcaption>
+    </figure>
+  </template>
+
+  <script>
+
+  PolymerExpressions.prototype.elementSize = function(el) {
+    var result = { w: 0, h: 0 };
+    for (ch in el) {
+      result.w += el[ch].offsetWidth;
+      result.h += el[ch].offsetHeight;
+    }
+    return result;
+  };
+
+  Polymer({
+
+      src: null,
+
+      canvas: null,
+
+      image: null,
+
+      throb: null,
+
+      exif: null,
+
+      publish: { updated: { value: 0, reflect: true } },
+      computed: {
+        size: 'elementSize($, updated)'
+      },
+
+      // ===================================================================
+      // ==== internals ====================================================
+      // ===================================================================
+
+      // More info: http://www.polymer-project.org/docs/polymer/polymer.html#lifecyclemethods
+      created: function() {
+        this.throb = {
+          type: 'balls',
+          color: [0x40,0x40,0x40],
+          size: { width: 300, height: 150 }
+        };
+      },
+
+      // ===================================================================
+      // ==== handlers =====================================================
+      // ===================================================================
+
+      srcChanged: function() {
+        // pass control to the main thread to avoid lock on image loading
+        this.async(function() { this.loadImage(); }, null, 10);
+      },
+
+      // ===================================================================
+      // ==== event fires ==================================================
+      // ===================================================================
+
+      fireImageReady: function() {
+        this.fire('mudasobwa-image-ready', { image: this.image, exif: this.exif });
+        this.updated += 1;
+      },
+
+      // ===================================================================
+      // ==== private helpers ==============================================
+      // ===================================================================
+
+      loadImage: function() {
+        this.$.imageLoader.url = this.src;
+        this.$.imageLoader.go();
+      },
+
+      gotImage: function() {
+        var self = this;
+
+        this.image = new Image();
+        this.image.onload = function() {
+          EXIF.getData(self.image, function() {
+            self.exif = EXIF.getAllTags(self.image);
+            self.fireImageReady();
+          });
+        };
+        this.image.src = URL.createObjectURL(this.$.imageLoader.response);
+      },
+
+      failImage: function() {
+        console.warn("Failed to get requested resource: ", this.src);
+      },
+
+      getExifTag: function(name) {
+        return this.exif ? this.exif[name] : null;
+      },
+
+      getComment: function() {
+        // retrieve comment from image
+        var comment = this.getExifTag('ImageDescription');
+
+        if (comment && comment.length > 0) { // byte array ⇒ utf8
+          var i = 0;
+          var c0 = c1 = c2 = c3 = 0;
+          var result = '';
+
+          while( i < comment.length ) {
+            c0 = comment.charCodeAt(i)&0xff;
+
+            if( c0 < 128 ) {
+              result += String.fromCharCode(c0);
+              i++;
+            } else if( (c0 > 191) && (c0 < 224) ) {
+              if( i+1 >= comment.length ) {
+                throw "Bad UTF-8 content in ImageDescription. Skipping...";
+              }
+              c2 = comment.charCodeAt(i+1)&0xff;
+              result += String.fromCharCode( ((c0&31)<<6) | (c2&63) );
+              i+=2;
+            } else {
+              if( i+2 >= comment.length  || i+1 >= comment.length ) {
+                throw "Bad UTF-8 content in ImageDescription. Skipping...";
+              }
+              c2 = comment.charCodeAt(i+1)&0xff;
+              c3 = comment.charCodeAt(i+2)&0xff;
+              result += String.fromCharCode( ((c0&15)<<12) | ((c2&63)<<6) | (c3&63) );
+              i+=3;
+            }
+          }
+
+          if (result && result.length > 0) {
+            this.fireComment(result);
+          }
+        }
+      }
+    });
+
+  </script>
+
+</polymer-element>

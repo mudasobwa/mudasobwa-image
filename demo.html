@@ -1,0 +1,26 @@
+<!doctype html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, minimum-scale=1.0, initial-scale=1.0, user-scalable=yes">
+  <title>mudasobwa-image Demo</title>
+
+  <script src="../webcomponentsjs/webcomponents.js"></script>
+  <link rel="import" href="mudasobwa-image.html">
+
+</head>
+<body unresolved>
+
+  <mudasobwa-image src="i/1.jpg"></mudasobwa-image>
+
+  <script>
+    document.addEventListener('polymer-ready', function() {
+      var img = document.querySelector("mudasobwa-image");
+      img.addEventListener("mudasobwa-image-ready", function(e) {
+        console.log(e.detail);
+      });
+    });
+  </script>
+
+
+</body>
+</html>

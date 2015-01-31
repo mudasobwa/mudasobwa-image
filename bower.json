@@ -1,0 +1,16 @@
+{
+  "name": "mudasobwa-image",
+  "version": "0.0.1",
+  "keywords": [
+    "seed",
+    "polymer",
+    "web-components",
+    "image",
+    "exif"
+  ],
+  "main": "mudasobwa-image.html",
+  "dependencies": {
+    "polymer": "Polymer/polymer#~0.5.4",
+    "core-ajax": "Polymer/core-ajax#~0.5.4"
+  }
+}
