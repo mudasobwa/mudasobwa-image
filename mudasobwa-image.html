@@ -1,6 +1,7 @@
 <link rel="import" href="../polymer/polymer.html">
 <link rel="import" href="../core-ajax/core-ajax.html">
 <script src="../exif-js/exif.js"></script>
+<!--script src="../caman/dist/caman.full.min.js"></script-->
 
 <polymer-element name="mudasobwa-throbber" attributes="width height color type throbbing">
   <template>
@@ -143,20 +144,21 @@ Base element for all the images operations.
 
   <script>
 
-  PolymerExpressions.prototype.elementSize = function(el) {
-    var result = { w: 0, h: 0 };
-    for (ch in el) {
-      result.w += el[ch].offsetWidth;
-      result.h += el[ch].offsetHeight;
-    }
-    return result;
-  };
+    PolymerExpressions.prototype.elementSize = function(el) {
+      var result = { w: 0, h: 0 };
+      for (ch in el) {
+        result.w += el[ch].offsetWidth;
+        result.h += el[ch].offsetHeight;
+      }
+      return result;
+    };
 
-  Polymer({
+    Polymer({
 
       src: null,
 
-      canvas: null,
+      canvases: null,
+      canvas: { value: null, reflect: true },
 
       image: null,
 
@@ -182,6 +184,7 @@ Base element for all the images operations.
           color: [0x80,0x80,0x80],
           size: { width: 300, height: 150 }
         };
+        this.canvases = [];
       },
 
       // ===================================================================
@@ -191,6 +194,17 @@ Base element for all the images operations.
       srcChanged: function() {
         // pass control to the main thread to avoid lock on image loading
         this.async(function() { this.loadImage(); });
+      },
+
+      canvasChanged: function() {
+        // FIXME INEFFICTIVE, BLINKING
+        this.canvases.forEach(function(c) {
+          c.style.display = "none";
+        });
+        this.canvas.style.display = "";
+        if (-1 === this.canvases.indexOf(this.canvas)) {
+          this.canvases.push(this.canvas);
+        }
       },
 
       // ===================================================================
@@ -240,16 +254,13 @@ Base element for all the images operations.
             break;
         }
 
-        // clear previous canvases // FIXME
         var container = this.$.figure;
-        while (container.firstChild) {
-          container.removeChild(container.firstChild);
-        }
 
         // create canvas
-        this.canvas = document.createElement('canvas');
-        container.style.width = (this.canvas.width = w) + 'px';
-        container.style.height = (this.canvas.height = h) + 'px';
+        var canvas = document.createElement('canvas');
+        container.style.width = (canvas.width = w) + 'px';
+        container.style.height = (canvas.height = h) + 'px';
+        this.canvas = canvas;
         container.appendChild(this.canvas);
 
         // draw image with proper orientation
@@ -269,6 +280,10 @@ Base element for all the images operations.
         return ctx;
       },
 
+      draw: function() {
+        return this.masterpiece();
+      },
+
       // ===================================================================
       // ==== private helpers ==============================================
       // ===================================================================
@@ -286,7 +301,7 @@ Base element for all the images operations.
         this.image.onload = function() {
           EXIF.getData(self.image, function() {
             self.exif = EXIF.getAllTags(self.image);
-            self.masterpiece();
+            self.draw();
             self.fireImageReady();
           });
           self.$.throbber.throbbing = false;
@@ -360,5 +375,86 @@ Base element for all the images operations.
     });
 
   </script>
+</polymer-element>
 
+<polymer-element name="mudasobwa-image-caption" extends="mudasobwa-image"
+                 attributes="format caption">
+  <script>
+    Polymer({
+      arabesques: { value: null, reflect: true },
+
+      format: '✎ {caption} ✉ {address} ⌚ {date} ',
+
+      caption: '',
+
+      // ===================================================================
+      // ==== overrides ====================================================
+      // ===================================================================
+
+      created: function() {
+        this.super();
+        this.arabesques = {
+          font: '12px Impact, fantasy',
+          color: 'rgba(255, 255, 255, 0.9)',
+          stroke: 'rgba(0, 0, 0, 1)',
+          shadow: {
+            blur: 7,
+            color: 'black'
+          },
+          lineWidth: 1
+        };
+      },
+
+      // ===================================================================
+      // ==== internals ====================================================
+      // ===================================================================
+
+      formatCaption: function() {
+        return this.format.replace(/\{[cC]\w*?\}/g, this.caption || '')
+                          .replace(/\{[aA]\w*?\}/g, this.address || '')
+                          .replace(/\{[gG]\w*?\}/g, this.latlon || '')
+                          .replace(/\{[dD]\w*?\}/g, this.date || '')
+                          .replace(/\{[tT]\w*?\}/g, this.time || '')
+                          .replace(/\{[hH]\w*?\}/g, this.author || '')
+                          .replace(/[^\p{S}]  /g, '')
+                          .trim();
+      },
+
+      draw: function() {
+        // the latter replace cleans up empties
+        var ctx = this.masterpiece();
+        if (!ctx) { // we are not yet ready
+          return false;
+        }
+        var text = this.formatCaption();
+
+        ctx.save();
+        // prepare settings for the future
+        ctx.font = this.arabesques.font;
+        ctx.fillStyle = this.arabesques.color;
+        ctx.strokeStyle = this.arabesques.stroke;
+        ctx.shadowColor = this.arabesques.shadow.color;
+        ctx.shadowBlur = this.arabesques.shadow.blur;
+        ctx.lineWidth = this.arabesques.lineWidth;
+
+        ctx.translate(this.canvas.width, this.canvas.height);
+        ctx.rotate(- Math.PI / 2);
+        ctx.strokeText(text, this.canvas.height - ctx.measureText(text).width - 6, -6);
+        ctx.shadowBlur = 0;
+        ctx.fillText(text, this.canvas.height - ctx.measureText(text).width - 6, -6);
+        ctx.restore();
+      },
+
+      // ===================================================================
+      // ==== event handlers ===============================================
+      // ===================================================================
+
+      captionChanged: function() {
+        this.draw();
+      }
+    });
+  </script>
+</polymer-element>
+
+<polymer-element name="mudasobwa-image-caman" extends="mudasobwa-image" noscript>
 </polymer-element>
