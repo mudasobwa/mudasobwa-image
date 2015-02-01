@@ -1,5 +1,6 @@
 <link rel="import" href="../polymer/polymer.html">
 <link rel="import" href="../core-ajax/core-ajax.html">
+<link rel="import" href="../mudasobwa-nominatim/mudasobwa-nominatim.html">
 <script src="../exif-js/exif.js"></script>
 <!--script src="../caman/dist/caman.full.min.js"></script-->
 
@@ -380,7 +381,7 @@ Base element for all the images operations.
     Polymer({
       arabesques: { value: null, reflect: true },
 
-      format: '✎ {caption} © {master} ✉ {geo} ⌚ {date} ',
+      format: '✎ {caption} © {master} ✉ {address} ⌚ {date} ',
 
       caption: '',
 
@@ -452,28 +453,112 @@ Base element for all the images operations.
 </polymer-element>
 
 <polymer-element name="mudasobwa-image-geo" extends="mudasobwa-image-caption"
-                 attributes="exify date time latlon"
+                 attributes="exify resolve date time address latlon"
                  on-mudasobwa-image-ready="{{ handleExif }}">
+  <template>
+    <mudasobwa-nominatim id="nominatim"
+      on-mudasobwa-nominatim-response="{{ gotAddress }}">
+    </mudasobwa-nominatim>
+    <shadow></shadow>
+  </template>
   <script>
     Polymer({
       latlon: null,
       exify: false,
+      resolve: false,
       date: null,
       time: null,
+      address: null,
 
       // ===================================================================
       // ==== internals ====================================================
       // ===================================================================
 
       formatCaption: function() {
+        var g = this.gypsy();
+        g = g ? (g.lat + ',' + g.lon) : '';
         return this.format.replace(/\{[cC]\w*?\}/g, this.caption || '')
                           .replace(/\{[aA]\w*?\}/g, this.address || '')
-                          .replace(/\{[gG]\w*?\}/g, this.gypsy() || '')
+                          .replace(/\{[gG]\w*?\}/g, g)
                           .replace(/\{[dD]\w*?\}/g, this.date || '')
                           .replace(/\{[tT]\w*?\}/g, this.time || '')
                           .replace(/\{[mM]\w*?\}/g, this.master || '')
                           .replace(/[^\p{S}]  /g, '')
                           .trim();
+      },
+
+      // ===================================================================
+      // ==== privats ======================================================
+      // ===================================================================
+
+      // Allows input as [l,l], [[ld,lm,ls],[ld,lm,ls],a], "l,l"
+      // FIXME altitude
+      gypsy: function() {
+        if (!this.latlon) {
+          return null;  // no worry
+        }
+
+        var result = { lat: {}, lon: {}, alt: null };
+        var data = (this.latlon.constructor === String) ?
+                    this.latlon.split(/[,;\-\s]+/) : this.latlon;
+
+        if (data.constructor !== Array) {
+          console.warn('Bad geo coordinates given. Wrong format, should be Array of String|Array. ');
+          throw this.latlon;
+        }
+
+        var pretty = /((\d+)°)?((\d+)′)?((\d+)″)?(\w)/;
+        var ss = { lat: ['N','S'], lon: ['E', 'W'] };
+        ['lat', 'lon'].forEach(function(l, i) {
+          switch (data[i].constructor) {
+            case Array:
+              result[l]['deg'] = data[i][0] || 0;
+              result[l]['min'] = data[i][1] || 0;
+              result[l]['sec'] = data[i][2] || 0;
+              result[l]['semisphere'] = data[i][3] || ss[l][0];
+              break;
+            case String:
+              data[i] = data[i].match(pretty) || +data[i];
+            case Number:
+              if (data[i].constructor === Array) { // pretty
+                result[l]['pretty'] = data[i];
+                result[l]['deg'] = data[i][2] || 0;
+                result[l]['min'] = data[i][4] || 0;
+                result[l]['sec'] = data[i][6] || 0;
+                result[l]['semisphere'] = data[i][7] || ss[l][0];
+              } else {                             // float
+                result[l]['float'] = data[i];
+                result[l]['deg'] = Math.floor(data[i]);
+                result[l]['min'] = Math.floor((data[i] - result[l]['deg']) * 60);
+                result[l]['sec'] = Math.floor(((data[i] - result[l]['deg']) * 60 - result[l]['min']) * 60);
+                result[l]['semisphere'] = ss[l][+(+data[i] === -data[i])];
+              }
+              break;
+            default:
+              console.warn('Bad geo coordinates given. Wrong format, should be Array of String|Array. ', this.latlon);
+              throw this.latlon;
+          }
+          if (!result[l]['float']) {
+            result[l]['float'] = (
+              result[l]['deg'] + result[l]['min']/60.0 + result[l]['sec']/3600.0
+            ) * (result[l]['semisphere'] === ss[l][0] ? 1 : -1);
+          }
+          if (result[l]['float'] < -90.0 || result[l]['float'] > 90.0) {
+            throw 'Irrelevant geolocation: [' + l + '=' + result[l]['float'] + ']. Geodata is corrupted.';
+          };
+          if (!result[l]['pretty']) {
+            result[l]['pretty'] = '' + result[l]['deg'] + '°'
+                                     + result[l]['min'] + '′'
+                                     + result[l]['sec'] + '″'
+                                     + result[l]['semisphere'];
+          }
+        });
+
+        // altitude
+        if (data.length > 2) {
+          result.alt = data[2];
+        }
+        return result;
       },
 
       parseDateTime: function() {
@@ -487,23 +572,6 @@ Base element for all the images operations.
         } else {
           this.date = this.time = this.datetime = null;
         }
-      },
-
-      gypsy: function() {
-        var value = this.latlon;
-        if(!value) {
-          return null; // no worry
-        }
-        var lla = { lat: +value[0], lon: +value[1], alt: +(value.length > 2 ? value[2] : 0) };
-        var result = {};
-        var hemispheres = { lat: ['N','S'], lon: ['E','W'] };
-        ['lat', 'lon'].forEach(function(tude) {
-          var deg = Math.floor(lla[tude]);
-          var min = Math.floor((lla[tude] - deg) * 60);
-          var sec = Math.floor(((lla[tude] - deg) * 60 - min) * 60);
-          result[tude] = '' + deg + '°' + min + '′' + sec + '″' + hemispheres[tude][+(+lla[tude] != -lla[tude])];
-        });
-        return result.lat + ',' + result.lon;
       },
 
       parseGypsy: function() {
@@ -528,6 +596,24 @@ Base element for all the images operations.
           this.parseGypsy();
           this.draw();
         }
+        if(this.resolve) {
+          this.parseGypsy();
+          this.loadAddress();
+        }
+      },
+
+      loadAddress: function() {
+        var g = this.gypsy();
+        if (g) {
+          this.$.nominatim.latitude = g.lat.float;
+          this.$.nominatim.longitude = g.lon.float;
+          this.$.nominatim.go();
+        }
+      },
+
+      gotAddress: function(e) {
+        this.address = e.detail.address;
+        this.draw();
       }
     });
     </script>
