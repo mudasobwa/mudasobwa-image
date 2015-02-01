@@ -724,6 +724,14 @@ Base element for all the images operations.
       },
 
       camanify: function() {
+        if (arguments.length > 2) { // observer called
+          var args = arguments[2];
+          var idx = args[1].length - 1;
+          var prop = args[2][idx * 2 + 1][0];
+          var val = args[0][idx];
+
+          this.history[prop] = val;
+        }
         this.dirty += 1;
       },
 
@@ -734,17 +742,7 @@ Base element for all the images operations.
           return;
         }
 
-        if (arguments.length > 2) { // observer called
-          var args = arguments[2];
-          var idx = args[1].length - 1;
-          var prop = args[2][idx * 2 + 1][0];
-          var val = args[0][idx];
-
-          this.history[prop] = val;
-        }
-
         var self = this;
-
         Caman(this.drawCaption(canvas), function() {
           var cmn = this;
 
@@ -758,7 +756,6 @@ Base element for all the images operations.
             'saturation', 'vibrance'
           ].forEach(function(attr) {
             if (self[attr] !== self.defaults[attr]) {
-              console.log('DRAW: ' + this.dirty + ' ' + attr);
               cmn[attr](self[attr]);
             }
           });
