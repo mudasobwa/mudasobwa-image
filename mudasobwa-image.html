@@ -2,7 +2,7 @@
 <link rel="import" href="../core-ajax/core-ajax.html">
 <link rel="import" href="../mudasobwa-nominatim/mudasobwa-nominatim.html">
 <script src="../exif-js/exif.js"></script>
-<!--script src="../caman/dist/caman.full.min.js"></script-->
+<script src="../caman/dist/caman.full.min.js"></script>
 
 <polymer-element name="mudasobwa-throbber" attributes="width height color type throbbing">
   <template>
@@ -644,5 +644,156 @@ Base element for all the images operations.
     </script>
 </polymer-element>
 
-<polymer-element name="mudasobwa-image-caman" extends="mudasobwa-image" noscript>
+<polymer-element name="mudasobwa-image-caman" extends="mudasobwa-image-geo"
+                 attributes="brightness channels clip colorize contrast
+                             exposure gamma greyscale hue invert noise
+                             saturation sepia vibrance">
+  <script>
+    Polymer({
+      brightness: 0,
+      channels: null,
+      clip: 100,
+      colorize: null,
+      contrast: 0,
+      // FIXME curves
+      exposure: 0,
+      // FIXME fillColor: null,
+      gamma: 1,
+      greyscale: false,
+      hue: 0,
+      invert: false,
+      noise: 0,
+      saturation: 0,
+      sepia: 0,
+      vibrance: 0,
+
+      camanify: function() {
+        if (!this.canvas || this.canvas.constructor !== HTMLCanvasElement) { return; }
+
+        var self = this;
+        Caman(this.canvas, function() {
+          if (self.brightness) this.brightness(self.brightness);
+          if (self.channels) this.channels(self.channels);
+          if (self.clip != 100) this.clip(self.clip);
+          if (self.colorize) this.colorize(self.colorize);
+          if (self.contrast) this.contrast(self.contrast);
+          if (self.exposure) this.exposure(self.exposure);
+          if (self.gamma !== 1) this.gamma(self.gamma);
+          if (self.hue) this.hue(self.hue);
+          if (self.noise) this.noise(self.noise);
+          if (self.sepia) this.sepia(self.sepia);
+          if (self.saturation) this.saturation(self.saturation);
+          if (self.vibrance) this.vibrance(self.vibrance);
+          if (self.greyscale) this.greyscale();
+          if (self.invert) this.invert();
+
+          this.render();
+        });
+      },
+
+      ready: function() {
+        this.super();
+        /*
+        this.channels = { red: 0, green: 0, blue: 0 };
+        this.colorize = { red: 0, green: 0, blue: 0, strength: 0 };
+        this.fillColor = { red: 0, green: 0, blue: 0 };
+        */
+      },
+
+      canvasChanged: function() {
+        this.super();
+        this.camanify();
+      },
+
+      brightnessChanged: function() {
+        if (!this.canvas || this.canvas.constructor !== HTMLCanvasElement) { return; }
+        var self = this;
+        Caman(this.canvas, function () { this.brightness(self.brightness).render(); });
+      },
+
+      channelsChanged: function() {
+        if (!this.canvas || this.canvas.constructor !== HTMLCanvasElement) { return; }
+        if(this.channels) {
+          var self = this;
+          Caman(this.canvas, function () { this.channels(self.channels).render(); });
+        }
+      },
+
+      clipChanged: function() {
+        if (!this.canvas || this.canvas.constructor !== HTMLCanvasElement) { return; }
+        var self = this;
+        Caman(this.canvas, function () { this.clip(self.clip).render(); });
+      },
+
+      colorizeChanged: function() {
+        if (!this.canvas || this.canvas.constructor !== HTMLCanvasElement) { return; }
+        if(this.colorize) {
+          var self = this;
+          Caman(this.canvas, function () { this.colorize(self.colorize).render(); });
+        }
+      },
+
+      contrastChanged: function() {
+        if (!this.canvas || this.canvas.constructor !== HTMLCanvasElement) { return; }
+        var self = this;
+        Caman(this.canvas, function () { this.contrast(self.contrast).render(); });
+      },
+
+      exposureChanged: function() {
+        if (!this.canvas || this.canvas.constructor !== HTMLCanvasElement) { return; }
+        var self = this;
+        Caman(this.canvas, function () { this.exposure(self.exposure).render(); });
+      },
+
+      gammaChanged: function() {
+        if (!this.canvas || this.canvas.constructor !== HTMLCanvasElement) { return; }
+        var self = this;
+        Caman(this.canvas, function () { this.gamma(self.gamma).render(); });
+      },
+
+      greyscaleChanged: function() {
+        if (!this.canvas || this.canvas.constructor !== HTMLCanvasElement) { return; }
+        if (this.greyscale) {
+          Caman(this.canvas, function () { this.greyscale().render(); });
+        }
+      },
+
+      hueChanged: function() {
+        if (!this.canvas || this.canvas.constructor !== HTMLCanvasElement) { return; }
+        var self = this;
+        Caman(this.canvas, function () { this.hue(self.hue).render(); });
+      },
+
+      invertChanged: function() {
+        if (!this.canvas || this.canvas.constructor !== HTMLCanvasElement) { return; }
+        if (this.greyscale) {
+          Caman(this.canvas, function () { this.invert().render(); });
+        }
+      },
+
+      noiseChanged: function() {
+        if (!this.canvas || this.canvas.constructor !== HTMLCanvasElement) { return; }
+        var self = this;
+        Caman(this.canvas, function () { this.noise(self.noise).render(); });
+      },
+
+      saturationChanged: function() {
+        if (!this.canvas || this.canvas.constructor !== HTMLCanvasElement) { return; }
+        var self = this;
+        Caman(this.canvas, function () { this.saturation(self.saturation).render(); });
+      },
+
+      sepiaChanged: function() {
+        if (!this.canvas || this.canvas.constructor !== HTMLCanvasElement) { return; }
+        var self = this;
+        Caman(this.canvas, function () { this.sepia(self.sepia).render(); });
+      },
+
+      vibranceChanged: function() {
+        if (!this.canvas || this.canvas.constructor !== HTMLCanvasElement) { return; }
+        var self = this;
+        Caman(this.canvas, function () { this.vibrance(self.vibrance).render(); });
+      }
+    });
+  </script>
 </polymer-element>
