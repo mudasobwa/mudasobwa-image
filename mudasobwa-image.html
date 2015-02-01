@@ -467,22 +467,22 @@ Base element for all the images operations.
   <script>
     Polymer({
       latlon: null,
+      gypsy: {},            // internal hash for all geo data formats
       exify: false,
       resolve: false,
       date: null,
       time: null,
       address: null,
+      location: null,
 
       // ===================================================================
       // ==== internals ====================================================
       // ===================================================================
 
       formatCaption: function() {
-        var g = this.gypsy();
-        g = g ? (g.lat + ',' + g.lon) : '';
         return this.format.replace(/\{[cC]\w*?\}/g, this.caption || '')
                           .replace(/\{[aA]\w*?\}/g, this.address || '')
-                          .replace(/\{[gG]\w*?\}/g, g)
+                          .replace(/\{[gG]\w*?\}/g, this.gypsy.floats || '')
                           .replace(/\{[dD]\w*?\}/g, this.date || '')
                           .replace(/\{[tT]\w*?\}/g, this.time || '')
                           .replace(/\{[mM]\w*?\}/g, this.master || '')
@@ -494,15 +494,10 @@ Base element for all the images operations.
       // ==== handlers =====================================================
       // ===================================================================
 
-      // ===================================================================
-      // ==== privats ======================================================
-      // ===================================================================
-
       // Allows input as [l,l], [[ld,lm,ls],[ld,lm,ls],a], "l,l"
-      // FIXME altitude
-      gypsy: function() {
+      latlonChanged: function() {
         if (!this.latlon) {
-          return null;  // no worry
+          return;  // no worry
         }
 
         var result = { lat: {}, lon: {}, alt: null };
@@ -521,7 +516,7 @@ Base element for all the images operations.
             case Array:
               result[l]['deg'] = data[i][0] || 0;
               result[l]['min'] = data[i][1] || 0;
-              result[l]['sec'] = data[i][2] || 0;
+              result[l]['sec'] = Math.floor(data[i][2] || 0);
               result[l]['semisphere'] = data[i][3] || ss[l][0];
               break;
             case String:
@@ -565,8 +560,24 @@ Base element for all the images operations.
         if (data.length > 2) {
           result.alt = data[2];
         }
-        return result;
+        result.pretty = [result.lat.pretty, result.lon.pretty].join(',');
+        result.floats = [result.lat.float, result.lon.float].join(',');
+        result.links = {
+          osm: 'https://www.openstreetmap.org/#map=18/' + result.lat.float + '/' + result.lon.float,
+          google: 'https://www.google.com/maps/place/' + result.lat.pretty + '+' + result.lon.pretty
+        }
+
+        this.gypsy = result;
+        this.fireGypsy();
+
+        if (this.resolve) {
+          this.loadAddress();
+        }
       },
+
+      // ===================================================================
+      // ==== privats ======================================================
+      // ===================================================================
 
       parseDateTime: function() {
         var timestamp = this.getExifTag('DateTimeOriginal') || this.getExifTag('GPSDateStamp');
@@ -595,30 +606,40 @@ Base element for all the images operations.
       },
 
       handleExif: function(e) {
-        if(this.exify) {
+        if (this.exify) {
           this.parseDateTime();
           this.parseGypsy();
           this.dirty += 1;
         }
-        if(this.resolve) {
-          this.parseGypsy();
-          this.loadAddress();
-        }
       },
 
       loadAddress: function() {
-        var g = this.gypsy();
-        if (g) {
-          this.$.nominatim.latitude = g.lat.float;
-          this.$.nominatim.longitude = g.lon.float;
+        if (this.gypsy) {
+          this.$.nominatim.latitude = this.gypsy.lat.float;
+          this.$.nominatim.longitude = this.gypsy.lon.float;
           this.$.nominatim.go();
         }
       },
 
       gotAddress: function(e) {
         this.address = e.detail.address;
+        this.location = e.detail.response;
+        this.fireLocation();
         this.dirty += 1;
+      },
+
+      // ===================================================================
+      // ==== event fires ==================================================
+      // ===================================================================
+
+      fireGypsy: function() {
+        this.fire('mudasobwa-image-gypsy', { gypsy: this.gypsy });
+      },
+
+      fireLocation: function() {
+        this.fire('mudasobwa-image-location', { location: this.location, display: this.address });
       }
+
     });
     </script>
 </polymer-element>
