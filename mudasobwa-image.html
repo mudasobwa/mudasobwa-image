@@ -112,7 +112,7 @@ Base element for all the images operations.
 @status alpha
 @homepage http://rocket-science.ru/wc/mudasobwa-image
 -->
-<polymer-element name="mudasobwa-image" attributes="src">
+<polymer-element name="mudasobwa-image" attributes="src dirty">
   <template>
     <link rel="stylesheet" href="mudasobwa-image.css" />
 
@@ -169,9 +169,9 @@ Base element for all the images operations.
 
       exif: null,
 
-      publish: { updated: { value: 0, reflect: true } },
+      dirty: 0,
       computed: {
-        size: 'elementSize($, updated)'
+        size: 'elementSize($, dirty)'
       },
 
       // ===================================================================
@@ -201,6 +201,10 @@ Base element for all the images operations.
         if (-1 === this.canvases.indexOf(this.canvas)) {
           this.canvases.push(this.canvas);
         }
+      },
+
+      dirtyChanged: function() {
+        this.job('mudasobwa-image-redraw', function() { this.draw(); }, 200);
       },
 
       // ===================================================================
@@ -274,7 +278,6 @@ Base element for all the images operations.
         }
 
         ctx.save();
-        this.updated += 1;
         return ctx;
       },
 
@@ -299,7 +302,7 @@ Base element for all the images operations.
         this.image.onload = function() {
           EXIF.getData(self.image, function() {
             self.exif = EXIF.getAllTags(self.image);
-            self.draw();
+            self.dirty += 1;
             self.fireImageReady();
           });
           self.$.throbber.throbbing = false;
@@ -488,6 +491,10 @@ Base element for all the images operations.
       },
 
       // ===================================================================
+      // ==== handlers =====================================================
+      // ===================================================================
+
+      // ===================================================================
       // ==== privats ======================================================
       // ===================================================================
 
@@ -581,12 +588,9 @@ Base element for all the images operations.
         var alt = this.getExifTag('GPSAltitude');
 
         if (lat && lat.constructor === Array && lon && lon.constructor === Array) { // GEO is presented
-          this.latlon =
-          [
-            (lat[0] + lat[1]/60.0 + lat[2]/3600.0) * ('S' == this.getExifTag("GPSLatitudeRef") ? -1 : 1),
-            (lon[0] + lon[1]/60.0 + lon[2]/3600.0) * ('W' == this.getExifTag("GPSLongitudeRef") ? -1 : 1),
-            ('1' == this.getExifTag("GPSAltitudeRef")) ? -alt : +alt
-          ];
+          lat[3] = this.getExifTag("GPSLatitudeRef");
+          lon[3] = this.getExifTag("GPSLongitudeRef");
+          this.latlon = [lat, lon, ('1' == this.getExifTag("GPSAltitudeRef")) ? -alt : +alt];
         }
       },
 
@@ -594,7 +598,7 @@ Base element for all the images operations.
         if(this.exify) {
           this.parseDateTime();
           this.parseGypsy();
-          this.draw();
+          this.dirty += 1;
         }
         if(this.resolve) {
           this.parseGypsy();
@@ -613,7 +617,7 @@ Base element for all the images operations.
 
       gotAddress: function(e) {
         this.address = e.detail.address;
-        this.draw();
+        this.dirty += 1;
       }
     });
     </script>
