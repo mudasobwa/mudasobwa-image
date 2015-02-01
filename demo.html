@@ -11,17 +11,18 @@
 </head>
 <body unresolved>
 
-  <mudasobwa-image-caman src="i/1.jpg" caption="¡Hola!" exify resolve contrast='20' greyscale>
+  <mudasobwa-image-caman src="i/1.jpg" caption="¡Hola!" exify resolve sepia="50">
   </mudasobwa-image-caman>
 
   <script>
     document.addEventListener('polymer-ready', function() {
-      var img = document.querySelector("mudasobwa-image-geo");
+      var img = document.querySelector("mudasobwa-image-caman");
       img.addEventListener("mudasobwa-image-ready", function(e) {
         console.log(e.detail);
       });
-      img.addEventListener("mudasobwa-image-description", function(e) {
+      img.addEventListener("mudasobwa-image-camanified", function(e) {
         console.log(e.detail);
+      //  img.invert = true;
       });
       img.addEventListener("mudasobwa-image-gypsy", function(e) {
         console.log(e.detail);

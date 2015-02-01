@@ -379,7 +379,7 @@ Base element for all the images operations.
 </polymer-element>
 
 <polymer-element name="mudasobwa-image-caption" extends="mudasobwa-image"
-                 attributes="format caption">
+                 attributes="format caption master">
   <script>
     Polymer({
       arabesques: { value: null, reflect: true },
@@ -390,12 +390,13 @@ Base element for all the images operations.
 
       master: '',
 
+      history: null,
+
       // ===================================================================
       // ==== overrides ====================================================
       // ===================================================================
 
-      ready: function() {
-        this.super();
+      created: function() {
         this.arabesques = {
           font: '12px Impact, fantasy',
           color: 'rgba(255, 255, 255, 0.9)',
@@ -406,6 +407,7 @@ Base element for all the images operations.
           },
           lineWidth: 1
         };
+        this.history = {};
       },
 
       // ===================================================================
@@ -449,7 +451,18 @@ Base element for all the images operations.
       // ===================================================================
 
       captionChanged: function() {
-        this.draw();
+        this.history.caption = this.caption;
+        this.dirty += 1;
+      },
+
+      formatChanged: function() {
+        this.history.format = this.format;
+        this.dirty += 1;
+      },
+
+      masterChanged: function() {
+        this.history.master = this.master;
+        this.dirty += 1;
       }
     });
   </script>
@@ -499,6 +512,8 @@ Base element for all the images operations.
         if (!this.latlon) {
           return;  // no worry
         }
+
+        this.history.latlon = this.latlon;
 
         var result = { lat: {}, lon: {}, alt: null };
         var data = (this.latlon.constructor === String) ?
@@ -641,15 +656,17 @@ Base element for all the images operations.
       }
 
     });
-    </script>
+  </script>
 </polymer-element>
 
 <polymer-element name="mudasobwa-image-caman" extends="mudasobwa-image-geo"
-                 attributes="brightness channels clip colorize contrast
+                 attributes="preset
+                             brightness channels clip colorize contrast
                              exposure gamma greyscale hue invert noise
-                             saturation sepia vibrance">
+                             saturation sepia sharpen vibrance">
   <script>
     Polymer({
+      preset: null,
       brightness: 0,
       channels: null,
       clip: 100,
@@ -665,29 +682,92 @@ Base element for all the images operations.
       noise: 0,
       saturation: 0,
       sepia: 0,
-      vibrance: 0,
+      sharpen: 15,
+      vibrance: 20,
+
+      defaults: {
+        preset: null,
+        brightness: 0,
+        channels: null,
+        clip: 100,
+        colorize: null,
+        contrast: 0,
+        exposure: 0,
+        gamma: 1,
+        greyscale: false,
+        hue: 0,
+        invert: false,
+        noise: 0,
+        saturation: 0,
+        sepia: 0,
+        sharpen: 15,
+        vibrance: 20,
+      },
+
+      observe: {
+        preset: 'camanify',
+        brightness: 'camanify',
+        channels: 'camanify',
+        clip: 'camanify',
+        colorize: 'camanify',
+        contrast: 'camanify',
+        exposure: 'camanify',
+        gamma: 'camanify',
+        greyscale: 'camanify',
+        hue: 'camanify',
+        invert: 'camanify',
+        noise: 'camanify',
+        saturation: 'camanify',
+        sepia: 'camanify',
+        sharpen: 'camanify',
+        vibrance: 'camanify'
+      },
 
       camanify: function() {
-        if (!this.canvas || this.canvas.constructor !== HTMLCanvasElement) { return; }
+        if (!this.canvas || this.canvas.constructor !== HTMLCanvasElement) {
+          return;
+        }
+
+        if (arguments.length > 2) { // observer called
+          var args = arguments[2];
+          var idx = args[1].length - 1;
+          var prop = args[2][idx * 2 + 1][0];
+          var val = args[0][idx];
+
+          this.history[prop] = val;
+        }
 
         var self = this;
-        Caman(this.canvas, function() {
-          if (self.brightness) this.brightness(self.brightness);
-          if (self.channels) this.channels(self.channels);
-          if (self.clip != 100) this.clip(self.clip);
-          if (self.colorize) this.colorize(self.colorize);
-          if (self.contrast) this.contrast(self.contrast);
-          if (self.exposure) this.exposure(self.exposure);
-          if (self.gamma !== 1) this.gamma(self.gamma);
-          if (self.hue) this.hue(self.hue);
-          if (self.noise) this.noise(self.noise);
-          if (self.sepia) this.sepia(self.sepia);
-          if (self.saturation) this.saturation(self.saturation);
-          if (self.vibrance) this.vibrance(self.vibrance);
-          if (self.greyscale) this.greyscale();
-          if (self.invert) this.invert();
 
-          this.render();
+        Caman(this.canvas, function() {
+          var cmn = this;
+
+          // start with preset
+          if (self.preset) cmn[self.preset]();
+
+          // valued properties
+          [
+            'brightness', 'channels', 'clip', 'colorize', 'contrast',
+            'exposure', 'gamma', 'hue', 'noise', 'sepia', 'sharpen',
+            'saturation', 'vibrance'
+          ].forEach(function(attr) {
+            if (self[attr] !== self.defaults[attr]) {
+              console.log('Will: ' + attr + " ⇒ " + self[attr]);
+              cmn[attr](self[attr]);
+            }
+          });
+
+          // methods
+          [
+            'greyscale', 'invert'
+          ].forEach(function(attr) {
+            if (self[attr]) cmn[attr]();
+          });
+
+          // FIXME custom filters (simply by name)
+
+          cmn.render();
+          self.fireCamanified();
         });
       },
 
@@ -700,100 +780,22 @@ Base element for all the images operations.
         */
       },
 
+      // ===================================================================
+      // ==== handlers =====================================================
+      // ===================================================================
+
       canvasChanged: function() {
         this.super();
         this.camanify();
       },
 
-      brightnessChanged: function() {
-        if (!this.canvas || this.canvas.constructor !== HTMLCanvasElement) { return; }
-        var self = this;
-        Caman(this.canvas, function () { this.brightness(self.brightness).render(); });
-      },
-
-      channelsChanged: function() {
-        if (!this.canvas || this.canvas.constructor !== HTMLCanvasElement) { return; }
-        if(this.channels) {
-          var self = this;
-          Caman(this.canvas, function () { this.channels(self.channels).render(); });
-        }
-      },
-
-      clipChanged: function() {
-        if (!this.canvas || this.canvas.constructor !== HTMLCanvasElement) { return; }
-        var self = this;
-        Caman(this.canvas, function () { this.clip(self.clip).render(); });
-      },
-
-      colorizeChanged: function() {
-        if (!this.canvas || this.canvas.constructor !== HTMLCanvasElement) { return; }
-        if(this.colorize) {
-          var self = this;
-          Caman(this.canvas, function () { this.colorize(self.colorize).render(); });
-        }
-      },
-
-      contrastChanged: function() {
-        if (!this.canvas || this.canvas.constructor !== HTMLCanvasElement) { return; }
-        var self = this;
-        Caman(this.canvas, function () { this.contrast(self.contrast).render(); });
-      },
-
-      exposureChanged: function() {
-        if (!this.canvas || this.canvas.constructor !== HTMLCanvasElement) { return; }
-        var self = this;
-        Caman(this.canvas, function () { this.exposure(self.exposure).render(); });
-      },
-
-      gammaChanged: function() {
-        if (!this.canvas || this.canvas.constructor !== HTMLCanvasElement) { return; }
-        var self = this;
-        Caman(this.canvas, function () { this.gamma(self.gamma).render(); });
-      },
-
-      greyscaleChanged: function() {
-        if (!this.canvas || this.canvas.constructor !== HTMLCanvasElement) { return; }
-        if (this.greyscale) {
-          Caman(this.canvas, function () { this.greyscale().render(); });
-        }
-      },
-
-      hueChanged: function() {
-        if (!this.canvas || this.canvas.constructor !== HTMLCanvasElement) { return; }
-        var self = this;
-        Caman(this.canvas, function () { this.hue(self.hue).render(); });
-      },
-
-      invertChanged: function() {
-        if (!this.canvas || this.canvas.constructor !== HTMLCanvasElement) { return; }
-        if (this.greyscale) {
-          Caman(this.canvas, function () { this.invert().render(); });
-        }
-      },
-
-      noiseChanged: function() {
-        if (!this.canvas || this.canvas.constructor !== HTMLCanvasElement) { return; }
-        var self = this;
-        Caman(this.canvas, function () { this.noise(self.noise).render(); });
-      },
-
-      saturationChanged: function() {
-        if (!this.canvas || this.canvas.constructor !== HTMLCanvasElement) { return; }
-        var self = this;
-        Caman(this.canvas, function () { this.saturation(self.saturation).render(); });
-      },
-
-      sepiaChanged: function() {
-        if (!this.canvas || this.canvas.constructor !== HTMLCanvasElement) { return; }
-        var self = this;
-        Caman(this.canvas, function () { this.sepia(self.sepia).render(); });
-      },
-
-      vibranceChanged: function() {
-        if (!this.canvas || this.canvas.constructor !== HTMLCanvasElement) { return; }
-        var self = this;
-        Caman(this.canvas, function () { this.vibrance(self.vibrance).render(); });
+      // ===================================================================
+      // ==== fire events ==================================================
+      // ===================================================================
+      fireCamanified: function() {
+        this.fire('mudasobwa-image-camanified', { history: this.history });
       }
+
     });
   </script>
 </polymer-element>
