@@ -223,11 +223,11 @@ Base element for all the images operations.
       masterpiece: function() {
         if(!this.image) {
           // We are not yet ready to redraw. No worry.
-          return false;
+          return null;
         }
 
         if (this.canvas && this.canvas.constructor === HTMLCanvasElement) {
-          return this.canvas.getContext('2d');
+          return this.canvas;
         }
 
         var w = this.image.width;
@@ -272,14 +272,11 @@ Base element for all the images operations.
         } else {
           ctx.drawImage(this.image, 0, 0);
         }
-
-        ctx.save();
-        this.canvas = canvas;
-        return ctx;
+        return canvas;
       },
 
       draw: function() {
-        return this.masterpiece();
+        this.canvas = this.masterpiece();
       },
 
       // ===================================================================
@@ -418,12 +415,12 @@ Base element for all the images operations.
                           .trim();
       },
 
-      draw: function() {
-        // the latter replace cleans up empties
-        var ctx = this.masterpiece();
-        if (!ctx) { // we are not yet ready
-          return false;
+      drawCaption: function(canvas) {
+        if (!canvas || canvas.constructor !== HTMLCanvasElement) {
+          return null;
         }
+
+        var ctx = canvas.getContext('2d');
         var text = this.formatCaption();
 
         ctx.save();
@@ -435,12 +432,18 @@ Base element for all the images operations.
         ctx.shadowBlur = this.arabesques.shadow.blur;
         ctx.lineWidth = this.arabesques.lineWidth;
 
-        ctx.translate(this.canvas.width, this.canvas.height);
+        ctx.translate(canvas.width, canvas.height);
         ctx.rotate(- Math.PI / 2);
-        ctx.strokeText(text, this.canvas.height - ctx.measureText(text).width - 6, -6);
+        ctx.strokeText(text, canvas.height - ctx.measureText(text).width - 6, -6);
         ctx.shadowBlur = 0;
-        ctx.fillText(text, this.canvas.height - ctx.measureText(text).width - 6, -6);
+        ctx.fillText(text, canvas.height - ctx.measureText(text).width - 6, -6);
         ctx.restore();
+
+        return canvas;
+      },
+
+      draw: function() {
+        this.canvas = this.drawCaption(this.masterpiece());
       },
 
       // ===================================================================
@@ -721,7 +724,13 @@ Base element for all the images operations.
       },
 
       camanify: function() {
-        if (!this.canvas || this.canvas.constructor !== HTMLCanvasElement) {
+        this.dirty += 1;
+      },
+
+      draw: function() {
+        var canvas = this.masterpiece();
+
+        if (!canvas || canvas.constructor !== HTMLCanvasElement || !canvas.width || !canvas.height) {
           return;
         }
 
@@ -736,7 +745,7 @@ Base element for all the images operations.
 
         var self = this;
 
-        Caman(this.canvas, function() {
+        Caman(this.drawCaption(canvas), function() {
           var cmn = this;
 
           // start with preset
@@ -749,6 +758,7 @@ Base element for all the images operations.
             'saturation', 'vibrance'
           ].forEach(function(attr) {
             if (self[attr] !== self.defaults[attr]) {
+              console.log('DRAW: ' + this.dirty + ' ' + attr);
               cmn[attr](self[attr]);
             }
           });
@@ -763,6 +773,10 @@ Base element for all the images operations.
           // FIXME custom filters (simply by name)
 
           cmn.render();
+
+          if (!self.canvas) {
+            self.canvas = canvas;
+          };
           self.fireCamanified();
         });
       },
@@ -779,11 +793,6 @@ Base element for all the images operations.
       // ===================================================================
       // ==== handlers =====================================================
       // ===================================================================
-
-      canvasChanged: function() {
-        this.super();
-        this.camanify();
-      },
 
       // ===================================================================
       // ==== fire events ==================================================
