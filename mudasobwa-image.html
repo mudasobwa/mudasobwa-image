@@ -158,7 +158,6 @@ Base element for all the images operations.
 
       src: null,
 
-      canvases: { value: null, reflect: true },
       canvas: { value: null, reflect: true },
 
       image: null,
@@ -180,7 +179,6 @@ Base element for all the images operations.
 
       // More info: http://www.polymer-project.org/docs/polymer/polymer.html#lifecyclemethods
       ready: function() {
-        this.canvases = [];
         this.throb = {
           type: 'balls',
           color: [0x80,0x80,0x80],
@@ -195,12 +193,6 @@ Base element for all the images operations.
       srcChanged: function() {
         // pass control to the main thread to avoid lock on image loading
         this.async(function() { this.loadImage(); });
-      },
-
-      canvasChanged: function() {
-        if (-1 === this.canvases.indexOf(this.canvas)) {
-          this.canvases.push(this.canvas);
-        }
       },
 
       dirtyChanged: function() {
@@ -234,6 +226,10 @@ Base element for all the images operations.
           return false;
         }
 
+        if (this.canvas && this.canvas.constructor === HTMLCanvasElement) {
+          return this.canvas.getContext('2d');
+        }
+
         var w = this.image.width;
         var h = this.image.height;
         var a = 0;
@@ -255,29 +251,30 @@ Base element for all the images operations.
         }
 
         // create canvas
-        this.canvas = document.createElement('canvas');
+        var canvas = document.createElement('canvas');
 
         var container = this.$.figure;
         while (container.firstChild) {
           container.removeChild(container.firstChild);
         }
-        container.style.width = (this.canvas.width = w) + 'px';
-        container.style.height = (this.canvas.height = h) + 'px';
-        container.appendChild(this.canvas);
+        container.style.width = (canvas.width = w) + 'px';
+        container.style.height = (canvas.height = h) + 'px';
+        container.appendChild(canvas);
 
         // draw image with proper orientation
-        var ctx = this.canvas.getContext('2d');
+        var ctx = canvas.getContext('2d');
         if (a != 0) {
           ctx.save();
-          ctx.translate(this.canvas.width / 2, this.canvas.height / 2);
+          ctx.translate(canvas.width / 2, canvas.height / 2);
           ctx.rotate(a);
-          ctx.drawImage(this.image, -this.canvas.height / 2, -this.canvas.width / 2);
+          ctx.drawImage(this.image, -canvas.height / 2, -canvas.width / 2);
           ctx.restore();
         } else {
           ctx.drawImage(this.image, 0, 0);
         }
 
         ctx.save();
+        this.canvas = canvas;
         return ctx;
       },
 
@@ -752,7 +749,6 @@ Base element for all the images operations.
             'saturation', 'vibrance'
           ].forEach(function(attr) {
             if (self[attr] !== self.defaults[attr]) {
-              console.log('Will: ' + attr + " ⇒ " + self[attr]);
               cmn[attr](self[attr]);
             }
           });
