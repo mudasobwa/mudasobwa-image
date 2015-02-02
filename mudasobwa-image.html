@@ -262,7 +262,7 @@ Base element for all the images operations.
 
         // temporary ugly hack; will be set properly after caman
         // canvas.style.zIndex = this.dirty * 2;
-        canvas.style.position = "absolute";
+        canvas.style.position = 'absolute';
 
         var container = this.$.figure;
         // FIXME NEEDED?
@@ -535,7 +535,7 @@ Base element for all the images operations.
           throw this.latlon;
         }
 
-        var pretty = /((\d+)°)?((\d+)′)?((\d+)″)?(\w)/;
+        var pretty = /^((\d+)°)?((\d+)′)?((\d+)″)?([SNEWsnew])?$/;
         var ss = { lat: ['N','S'], lon: ['E', 'W'] };
         ['lat', 'lon'].forEach(function(l, i) {
           switch (data[i].constructor) {
