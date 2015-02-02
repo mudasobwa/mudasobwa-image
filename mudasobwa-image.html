@@ -6,15 +6,13 @@
 
 <polymer-element name="mudasobwa-throbber" attributes="width height color type throbbing">
   <template>
-    <div id="container" style="width:{{ w }}px;height:{{ h }}px;display:{{ d }};"></div>
+    <div id="container" style="width:{{ width }}px;height:{{ height }}px;display:{{ d }};"></div>
   </template>
   <script>
     Polymer({
       throbber: { value: null, reflect: true },
 
       computed: {
-        w: 'throbber ? width : 0',
-        h: 'throbber ? height : 0',
         d: 'throbber ? "block" : "none"'
       },
 
@@ -112,7 +110,7 @@ Base element for all the images operations.
 @status alpha
 @homepage http://rocket-science.ru/wc/mudasobwa-image
 -->
-<polymer-element name="mudasobwa-image" attributes="src dirty">
+<polymer-element name="mudasobwa-image" attributes="src dirty width height">
   <template>
     <link rel="stylesheet" href="mudasobwa-image.css" />
 
@@ -123,16 +121,16 @@ Base element for all the images operations.
       on-core-error="{{ failImage }}">
     </core-ajax>
 
-    <mudasobwa-throbber
-      id="throbber"
-      width="{{ throb.size.width }}"
-      height="{{ throb.size.height }}"
-      color="{{ throb.color }}"
-      type="{{ throb.type }}">
-    </mudasobwa-throbber>
-
     <figure>
-      <div id="figure"></div>
+      <div id="figure" style="width:{{ width }}px;height:{{ height }}px;overflow:hidden;">
+        <mudasobwa-throbber
+            id="throbber"
+            width="{{ throb.size.width }}"
+            height="{{ throb.size.height }}"
+            color="{{ throb.color }}"
+            type="{{ throb.type }}">
+        </mudasobwa-throbber>
+      </div>
       <figcaption id="caption">
         <template if="{{ description }}">
           <p>{{ description }}</p>
@@ -164,6 +162,10 @@ Base element for all the images operations.
 
       description: { value: null, reflect: true },
 
+      width: 300,
+
+      height: 150,
+
       throb: { value: null, reflect: true },
 
       exif: null,
@@ -182,7 +184,7 @@ Base element for all the images operations.
         this.throb = {
           type: 'balls',
           color: [0x80,0x80,0x80],
-          size: { width: 300, height: 150 }
+          size: { width: this.width, height: this.height }
         };
       },
 
@@ -221,12 +223,13 @@ Base element for all the images operations.
       *  @todo currently we do not handle mirroring
       */
       masterpiece: function() {
-        if(!this.image) {
+        if(!this.image || !this.image.height || !this.image.width) {
           // We are not yet ready to redraw. No worry.
           return null;
         }
 
         if (this.canvas && this.canvas.constructor === HTMLCanvasElement) {
+          // canvas was already created for this image
           return this.canvas;
         }
 
@@ -250,16 +253,21 @@ Base element for all the images operations.
             break;
         }
 
+        if (!h || !w) { // I guess I eliminated every cause of this, but...
+          console.warn('Bug in mudasobwa-image: preliminary redraw. FIXME');
+        }
+
         // create canvas
         var canvas = document.createElement('canvas');
 
         var container = this.$.figure;
-        while (container.firstChild) {
-          container.removeChild(container.firstChild);
-        }
+        //while (container.firstChild) {
+          //container.removeChild(container.firstChild);
+        //}
         container.style.width = (canvas.width = w) + 'px';
         container.style.height = (canvas.height = h) + 'px';
         container.appendChild(canvas);
+        this.$.throbber.throbbing = false;
 
         // draw image with proper orientation
         var ctx = canvas.getContext('2d');
@@ -296,17 +304,15 @@ Base element for all the images operations.
         this.image.onload = function() {
           EXIF.getData(self.image, function() {
             self.exif = EXIF.getAllTags(self.image);
-            self.dirty += 1;
             self.fireImageReady();
+            self.dirty += 1;
           });
-          self.$.throbber.throbbing = false;
         };
         this.image.src = URL.createObjectURL(this.$.imageLoader.response);
       },
 
       failImage: function() {
         console.warn("Failed to get requested resource: ", this.src);
-        this.$.throbber.throbbing = false;
       },
 
       getExifTag: function(name) {
@@ -401,7 +407,7 @@ Base element for all the images operations.
           },
           lineWidth: 1
         };
-        this.history = {};
+        this.history = [];
       },
 
       // ===================================================================
@@ -451,17 +457,17 @@ Base element for all the images operations.
       // ===================================================================
 
       captionChanged: function() {
-        this.history.caption = this.caption;
+        this.history.push({caption: this.caption});
         this.dirty += 1;
       },
 
       formatChanged: function() {
-        this.history.format = this.format;
+        this.history.push({format: this.format});
         this.dirty += 1;
       },
 
       masterChanged: function() {
-        this.history.master = this.master;
+        this.history.push({master: this.master});
         this.dirty += 1;
       }
     });
@@ -513,7 +519,7 @@ Base element for all the images operations.
           return;  // no worry
         }
 
-        this.history.latlon = this.latlon;
+        this.history.push({latlon: this.latlon});
 
         var result = { lat: {}, lon: {}, alt: null };
         var data = (this.latlon.constructor === String) ?
@@ -700,8 +706,8 @@ Base element for all the images operations.
         noise: 0,
         saturation: 0,
         sepia: 0,
-        sharpen: 15,
-        vibrance: 20,
+        sharpen: 0,
+        vibrance: 0,
       },
 
       observe: {
@@ -730,7 +736,9 @@ Base element for all the images operations.
           var prop = args[2][idx * 2 + 1][0];
           var val = args[0][idx];
 
-          this.history[prop] = val;
+          var hist = {};
+          hist[prop] = val;
+          this.history.push(hist);
         }
         this.dirty += 1;
       },
@@ -743,7 +751,7 @@ Base element for all the images operations.
         }
 
         var self = this;
-        Caman(this.drawCaption(canvas), function() {
+        Caman(canvas, function() {
           var cmn = this;
 
           // start with preset
@@ -769,12 +777,14 @@ Base element for all the images operations.
 
           // FIXME custom filters (simply by name)
 
-          cmn.render();
+          cmn.render(function() {
+            var c = self.drawCaption(canvas);
+            if (!self.canvas) {
+              self.canvas = c;
+            };
+            self.fireCamanified(c);
+          });
 
-          if (!self.canvas) {
-            self.canvas = canvas;
-          };
-          self.fireCamanified();
         });
       },
 
@@ -794,8 +804,8 @@ Base element for all the images operations.
       // ===================================================================
       // ==== fire events ==================================================
       // ===================================================================
-      fireCamanified: function() {
-        this.fire('mudasobwa-image-camanified', { history: this.history });
+      fireCamanified: function(canvas) {
+        this.fire('mudasobwa-image-camanified', { history: this.history, canvas: canvas });
       }
 
     });

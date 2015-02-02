@@ -11,7 +11,7 @@
 </head>
 <body unresolved>
 
-  <mudasobwa-image-caman src="i/1.jpg" caption="¡Hola!" exify resolve preset="sunrise">
+  <mudasobwa-image-caman src="i/1.jpg" width="800" height="763" caption="¡Hola!" exify resolve>
   </mudasobwa-image-caman>
 
   <script>
@@ -22,7 +22,6 @@
       });
       img.addEventListener("mudasobwa-image-camanified", function(e) {
         console.log(e.detail);
-        img.invert = true;
       });
       img.addEventListener("mudasobwa-image-gypsy", function(e) {
         console.log(e.detail);
