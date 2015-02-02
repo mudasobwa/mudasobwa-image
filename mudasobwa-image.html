@@ -175,12 +175,16 @@ Base element for all the images operations.
         size: 'elementSize($, dirty)'
       },
 
+      orientation: 1,
+
       // ===================================================================
       // ==== internals ====================================================
       // ===================================================================
 
       // More info: http://www.polymer-project.org/docs/polymer/polymer.html#lifecyclemethods
       ready: function() {
+        this.canvas = null;
+        this.description = null;
         this.throb = {
           type: 'balls',
           color: [0x80,0x80,0x80],
@@ -309,6 +313,7 @@ Base element for all the images operations.
         this.image.onload = function() {
           EXIF.getData(self.image, function() {
             self.exif = EXIF.getAllTags(self.image);
+            self.orientation = self.getExifTag('Orientation');
             self.fireImageReady();
             self.dirty += 1;
           });
