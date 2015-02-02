@@ -11,24 +11,24 @@
 </head>
 <body unresolved>
 
-  <mudasobwa-image-caman src="i/1.jpg" width="800" height="763" caption="¡Hola!" exify resolve>
+  <mudasobwa-image-caman src="i/2.jpg" width="800" height="763" caption="¡Hola!" master="mudasobwa.ru" resolve>
   </mudasobwa-image-caman>
 
   <script>
     document.addEventListener('polymer-ready', function() {
       var img = document.querySelector("mudasobwa-image-caman");
       img.addEventListener("mudasobwa-image-ready", function(e) {
-        console.log(e.detail);
+        //console.log(e.detail);
       });
       img.addEventListener("mudasobwa-image-camanified", function(e) {
         console.log(e.detail);
-        img.invert = true;
+        img.invert ? img.greyscale = true : img.invert = true;
       });
       img.addEventListener("mudasobwa-image-gypsy", function(e) {
-        console.log(e.detail);
+        //console.log(e.detail);
       });
       img.addEventListener("mudasobwa-image-location", function(e) {
-        console.log(e.detail);
+        //console.log(e.detail);
       });
 
       // setInterval(function() { img.src = "i/2.jpg"; }, 1000);

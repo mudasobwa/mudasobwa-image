@@ -260,7 +260,12 @@ Base element for all the images operations.
         // create canvas
         var canvas = document.createElement('canvas');
 
+        // temporary ugly hack; will be set properly after caman
+        // canvas.style.zIndex = this.dirty * 2;
+        canvas.style.position = "absolute";
+
         var container = this.$.figure;
+        // FIXME NEEDED?
         //while (container.firstChild) {
           //container.removeChild(container.firstChild);
         //}
@@ -627,7 +632,7 @@ Base element for all the images operations.
       },
 
       handleExif: function(e) {
-        if (this.exify) {
+        if (this.exify || this.resolve) {
           this.parseDateTime();
           this.parseGypsy();
           this.dirty += 1;
@@ -778,7 +783,9 @@ Base element for all the images operations.
           // FIXME custom filters (simply by name)
 
           cmn.render(function() {
-            self.fireCamanified(self.canvas = self.drawCaption(this.canvas));
+            self.canvas = self.drawCaption(this.canvas);
+            self.canvas.style.zIndex = +self.canvas.getAttribute('data-caman-id') + 1;
+            self.fireCamanified();
           });
 
         });
