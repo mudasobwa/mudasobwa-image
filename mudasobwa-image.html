@@ -666,7 +666,7 @@ Base element for all the images operations.
 </polymer-element>
 
 <polymer-element name="mudasobwa-image-caman" extends="mudasobwa-image-geo"
-                 attributes="preset
+                 attributes="preset safeCaption
                              brightness channels clip colorize contrast
                              exposure gamma greyscale hue invert noise
                              saturation sepia sharpen vibrance">
@@ -707,7 +707,7 @@ Base element for all the images operations.
         saturation: 0,
         sepia: 0,
         sharpen: 0,
-        vibrance: 0,
+        vibrance: 0
       },
 
       observe: {
@@ -778,11 +778,7 @@ Base element for all the images operations.
           // FIXME custom filters (simply by name)
 
           cmn.render(function() {
-            var c = self.drawCaption(canvas);
-            if (!self.canvas) {
-              self.canvas = c;
-            };
-            self.fireCamanified(c);
+            self.fireCamanified(self.canvas = self.drawCaption(this.canvas));
           });
 
         });
