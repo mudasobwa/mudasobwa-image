@@ -1,6 +1,6 @@
 {
   "name": "mudasobwa-image",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "keywords": [
     "seed",
     "polymer",
@@ -11,6 +11,9 @@
   "main": "mudasobwa-image.html",
   "dependencies": {
     "polymer": "Polymer/polymer#~0.5.4",
-    "core-ajax": "Polymer/core-ajax#~0.5.4"
+    "core-ajax": "Polymer/core-ajax#~0.5.4",
+    "caman": "~4.1.2",
+    "exif-js": "jseidelin/exif-js",
+    "mudasobwa-nominatim": "mudasobwa/mudasobwa-nominatim#~0.2.0"
   }
 }
