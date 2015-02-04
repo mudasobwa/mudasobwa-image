@@ -1,6 +1,6 @@
 {
   "name": "mudasobwa-image",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "keywords": [
     "seed",
     "polymer",
@@ -8,6 +8,7 @@
     "image",
     "exif"
   ],
+  "ignore": [],
   "main": "mudasobwa-image.html",
   "dependencies": {
     "polymer": "Polymer/polymer#~0.5.4",
